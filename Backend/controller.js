@@ -1,67 +1,51 @@
 const express = require('express')
-const User = require('./schema')
-
+const UserModel = require('./schema')
 
 const postUser = async (req, res) => {
-    try {
-      const { userId, convoId, userMessage } = req.body;
-  
-      // Find the user
-      const user = await User.findOne({ userId });
-  
-      if (!user) {
-        //const user = await User.create({userId, convoId, userMessage})
-        const user = new User({userId, convoId, userMessage})
-        user.save()
-        // res.status(200).json(user)
-        //return res.status(404).json({ error: 'User not found' });
-      }
-  
-      // Find the conversation
-      const conversation = user.conversations[0]?.messages;
-  
-      if (!conversation) {
-        const user = await User.findOne({ userId })
+  try {
+    const { userId, convoId, userMessage } = req.body;
 
-        const tempMsg = {
-            user : userMessage, 
-            computer : "This is test"
-        }
-        const tempCon = {
-            convoId: convoId,
-            messages: [tempMsg]
-        }
-        const result = await User.updateOne(
-            { userId: userId },
-            { $push: { conversations: tempCon } }
-          );
+    // Find the user by userId
+    let usermodel = await UserModel.findOne({ userId });
 
-          const test = await User.updateOne(userId,tempCon)
-        
-          if (result.modifiedCount === 1) {
-            console.log('Conversation added successfully');
-          } else {
-            console.error('Failed to add conversation');
-          }
-        return res.status(404).json({ error: 'Conversation not found' });
-      }
-  
-      // Assuming a simple rule for computer responses
-      // You can implement your logic here
-      const computerMessage = `Computer: You said '${userMessage}', I heard you!`;
-  
-      // Add the user's message and computer's response to the conversation
-      conversation.messages.push({ user: userMessage, computer: computerMessage });
-  
-      // Save the updated user document
-      await user.save();
-  
-      return res.status(200).json({ computerMessage });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: 'Internal server error' });
+    if (!usermodel) {
+      // If user not found, create a new user
+      usermodel = new UserModel({
+        userId,
+        conversations: [],
+      });
     }
-  };
+
+    // Find the conversation by convoId or create a new one
+    let conversation = usermodel.conversations.find((c) => c.convoId === convoId);
+
+    if (!conversation) {
+      conversation = {
+        convoId,
+        messages: [],
+      };
+      usermodel.conversations.push(conversation);
+    }
+
+    // Create a new message
+    const newMessage = {
+      user: userMessage,
+      computer: `Computer: You said '${userMessage}', I heard you!`, // Computer's response based on user's message
+    };
+
+    // Add the new message to the conversation
+    conversation.messages.push(newMessage);
+
+    // Save the updated user document
+    await usermodel.save();
+
+    return res.status(200).json({ computerMessage: newMessage.computer });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 
 module.exports = {
     postUser
